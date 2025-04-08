@@ -20,11 +20,11 @@ class MyCustomDataLoader:
             batch_indices = self.indices[i:i + self.batch_size]
             images, labels = zip(*[self.dataset[idx]  for idx in batch_indices])
             num_outs = len(images[0])
-            if (num_outs == 1):
-                images = torch.stack(images)
-            elif (num_outs == 2):
+            if (num_outs == 2):
                 x, y = zip(*[image for image in images])
                 x, y = torch.stack(x), torch.stack(y)
+            else:
+                images = torch.stack(images)
             labels = torch.tensor(labels)
             pairs = []
             for j in range(len(batch_indices)):
