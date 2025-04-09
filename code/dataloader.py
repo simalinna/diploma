@@ -41,9 +41,9 @@ class MyCustomDataLoader:
                 
             pairs = torch.stack(pairs)
 
-            if num_outs == 2:
+            if (num_outs == 2):
                 data = [x, y, pairs]
-            elif num_outs == 1:
+            else:
                 data = [images, pairs]
 
             yield data, labels
