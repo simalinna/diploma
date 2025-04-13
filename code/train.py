@@ -71,9 +71,10 @@ def main(args):
     # train_dataloader = DataLoader(train_data, batch_size, shuffle=False)
     # val_dataloader = DataLoader(val_data, batch_size, shuffle=False)
 
-    # инициализируем оптимизатор и гиперпармаметры
+    # инициализируем оптимизатор, планировщик и гиперпармаметры
     
-    opt = Adam(model.parameters(), lr=2e-4, weight_decay=1e-6)
+    opt = Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(opt, step_size=10, gamma=0.8)
     num_epochs = args.epochs
     
     # проверяем, нужно ли загружать данные из эксперимента
@@ -87,6 +88,7 @@ def main(args):
             cp = torch.load(load_exp_path + "/model.pt", weights_only=True)
             model.load_state_dict(cp["model_state_dict"])
             opt.load_state_dict(cp["optimizer_state_dict"])
+            scheduler.load_state_dict(cp["scheduler_state_dict"])
 
             # загружаем список для построения графиков
             stats_file = open(load_exp_path + "/stats.json", "r")
@@ -168,6 +170,8 @@ def main(args):
                 avg_val_vicreg_loss += val_vicreg.item()
                 avg_val_ce_loss += val_ce.item()
 
+        scheduler.step()
+
         # сохраняем веса модели и данные обучения в файл
         torch.save({
             "epoch": epoch + 1,
@@ -175,7 +179,8 @@ def main(args):
             "projector_dim": projector_dim,
             "num_classes": num_classes,
             "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": opt.state_dict()
+            "optimizer_state_dict": opt.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
         }, save_exp_path + "/model.pt")
 
         # вычисляем средние значения всех функций ошибки
