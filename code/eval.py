@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from torch.optim import SGD
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import StepLR
+from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from torchvision.datasets.cifar import CIFAR10, CIFAR100
@@ -107,9 +108,9 @@ def main(args):
 
     # инициализируем оптимизатор, планировщик и гиперпармаметры
     
-    opt = SGD(linear.parameters(), lr=0.02, weight_decay=1e-6)
+    opt = Adam(model.parameters(), lr=1e-5, weight_decay=1e-3)
+    scheduler = StepLR(opt, step_size=10, gamma=0.3)
     num_epochs = args.epochs
-    scheduler = CosineAnnealingLR(opt, num_epochs)
     
     # инициализируем функцию ошибки классификатора
     
