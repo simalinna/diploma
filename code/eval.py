@@ -18,37 +18,6 @@ import augmentations as aug
 
 
 
-def calc_accuracy(model, linear, device, dataloader):
-
-    total = 0
-    correct_top1 = 0
-    correct_top5 = 0
-    with torch.no_grad():
-        for images, labels in dataloader:
-    
-            images, labels = images.to(device), labels.to(device)
-            embeddings = model.encoder(images)
-            predictions = linear(embeddings)
-
-            # Top-1
-            _, predicted_top1 = torch.max(predictions.data, 1)
-            correct_top1 += (predicted_top1 == labels).sum().item()
-
-            # Top-5
-            _, predicted_top5 = predictions.topk(5, 1, True, True)
-            predicted_top5 = predicted_top5.t()
-            correct = predicted_top5.eq(labels.view(1, -1).expand_as(predicted_top5))
-            correct_top5 += correct[:5].reshape(-1).float().sum(0, keepdim=True).item()
-            
-            total += labels.size(0)
-    
-    my_accuracy_top1=100 * correct_top1 / total
-    my_accuracy_top5=100 * correct_top5 / total
-
-    return my_accuracy_top1, my_accuracy_top5
-
-
-
 def get_arguments():
     
     parser = argparse.ArgumentParser(add_help=False)
@@ -132,11 +101,26 @@ def main(args):
     for epoch in progress:
         linear.train()
         avg_loss = 0
+        total = 0
+        correct_top1 = 0
+        correct_top5 = 0
         for step, (images, labels) in enumerate(train_dataloader, start=epoch * len(train_dataloader)):
 
             images, labels = images.to(device), labels.to(device)
             embeddings = model.encoder(images)
             predictions = linear(embeddings)
+
+            # Top-1
+            _, predicted_top1 = torch.max(predictions.data, 1)
+            correct_top1 += (predicted_top1 == labels).sum().item()
+
+            # Top-5
+            _, predicted_top5 = predictions.topk(5, 1, True, True)
+            predicted_top5 = predicted_top5.t()
+            correct = predicted_top5.eq(labels.view(1, -1).expand_as(predicted_top5))
+            correct_top5 += correct[:5].reshape(-1).float().sum(0, keepdim=True).item()
+
+            total += labels.size(0)
             
             loss = criterion(predictions, labels)
             avg_loss += loss.item()
@@ -147,15 +131,47 @@ def main(args):
 
             progress.set_description(f"Ошибка {loss.item():.2f}, Шаг {step+1}/{len(train_dataloader)*num_epochs}")
 
+        train_accuracy_top1=100 * correct_top1 / total
+        train_accuracy_top5=100 * correct_top5 / total
+
+        # валидация
+        linear.eval()
+        avg_test_loss = 0
+        total = 0
+        correct_top1 = 0
+        correct_top5 = 0
+        with torch.no_grad():
+            for step, (images, labels) in enumerate(test_dataloader, start=epoch * len(test_dataloader)):
+                
+                images, labels = images.to(device), labels.to(device)
+                embeddings = model.encoder(images)
+                predictions = linear(embeddings)
+
+                # Top-1
+                _, predicted_top1 = torch.max(predictions.data, 1)
+                correct_top1 += (predicted_top1 == labels).sum().item()
+
+                # Top-5
+                _, predicted_top5 = predictions.topk(5, 1, True, True)
+                predicted_top5 = predicted_top5.t()
+                correct = predicted_top5.eq(labels.view(1, -1).expand_as(predicted_top5))
+                correct_top5 += correct[:5].reshape(-1).float().sum(0, keepdim=True).item()
+
+                total += labels.size(0)
+
+                test_loss = criterion(predictions, labels)
+                avg_test_loss += test_loss.item()
+
         scheduler.step()
 
-        train_accuracy_top1, train_accuracy_top5 = calc_accuracy(model, linear, device, train_dataloader)
-        test_accuracy_top1, test_accuracy_top5 = calc_accuracy(model, linear, device, test_dataloader)
+        test_accuracy_top1=100 * correct_top1 / total
+        test_accuracy_top5=100 * correct_top5 / total
 
         # сохраняем значения функции ошибки в словарь
         stats = dict(
             epoch=epoch+1,
             loss=avg_loss/len(train_dataloader),
+            test_loss=avg_test_loss/len(test_dataloader),
             train_accuracy_top1 =  train_accuracy_top1,
             train_accuracy_top5 =  train_accuracy_top5,
             test_accuracy_top1 =  test_accuracy_top1,
@@ -167,11 +183,9 @@ def main(args):
         # сохраняем список в файл
         stats_file = open(save_exp_path + "/eval_stats.json", "w")
         print(json.dumps(stats_list), file=stats_file) 
-
-    my_accuracy_top1, my_accuracy_top5 = calc_accuracy(model, linear, device, test_dataloader)
     
-    print(f"\nТочность Top-1: {my_accuracy_top1:.2f} %")
-    print(f"Точность Top-5: {my_accuracy_top5:.2f} %\n")
+    print(f"\nТочность Top-1: {stats_list[num_epochs-1]['test_accuracy_top1']:.2f} %")
+    print(f"Точность Top-5: {stats_list[num_epochs-1]['test_accuracy_top5']:.2f} %\n")
 
 
 
