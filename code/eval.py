@@ -3,7 +3,7 @@ from torch import nn
 from torch.optim import SGD
 from torch.optim.lr_scheduler import StepLR
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 from torchvision.datasets.cifar import CIFAR10, CIFAR100
 from torchvision.datasets.imagenet import ImageNet
@@ -38,7 +38,6 @@ def main(args):
     device = torch.device("cuda:6" if torch.cuda.is_available() else "cpu")
     load_exp_path = '../experiments/' + args.load_exp
     state = torch.load(load_exp_path + "/model.pt", weights_only=True, map_location=device)
-    num_classes = 10
     encoder_dim, projector_dim, num_classes = state["encoder_dim"], state["projector_dim"], state["num_classes"]
     model = VICReg(encoder_dim, projector_dim, num_classes).to(device)
     model.load_state_dict(state["model_state_dict"])
@@ -49,7 +48,7 @@ def main(args):
 
     # создаем однослойный линейный классификатор и переносим на gpu
     
-    linear_num_classes = 10
+    linear_num_classes = 30
     linear = nn.Linear(encoder_dim, linear_num_classes).to(device)
 
     # инициализируем аугментации
@@ -60,14 +59,24 @@ def main(args):
 
     print("Загрузка датасетов...")
     
-    train_data = CIFAR10(root="../datasets", train=True, download=True, transform=transforms)
-    test_data = CIFAR10(root="../datasets", train=False, download=True, transform=transforms)
+    # train_data = CIFAR10(root="../datasets", train=True, download=True, transform=transforms)
+    # test_data = CIFAR10(root="../datasets", train=False, download=True, transform=transforms)
     
-    # train_data = CIFAR100(root="./Datasets", train=True, download=True, transform=transforms)
-    # test_data = CIFAR100(root="./Datasets", train=False, download=True, transform=transforms)
+    train_data = CIFAR100(root="../datasets", train=True, download=True, transform=transforms)
+    test_data = CIFAR100(root="../datasets", train=False, download=True, transform=transforms)
     
     # train_data = ImageNet(root="../Datasets", split='train', transform=transforms)
     # test_data = ImageNet(root="../Datasets", split='val', transform=transforms)
+
+    # разделение на классы
+
+    selected_classes = list(range(70, 100))
+
+    indices = [i for i, (_, target) in enumerate(train_data) if target in selected_classes]
+    train_data = Subset(train_data, indices)
+
+    indices = [i for i, (_, target) in enumerate(test_data) if target in selected_classes]
+    test_data = Subset(test_data, indices)
 
     # формируем пакеты
     
@@ -106,6 +115,7 @@ def main(args):
         correct_top5 = 0
         for step, (images, labels) in enumerate(train_dataloader, start=epoch * len(train_dataloader)):
 
+            labels -= 70
             images, labels = images.to(device), labels.to(device)
             embeddings = model.encoder(images)
             predictions = linear(embeddings)
@@ -143,6 +153,7 @@ def main(args):
         with torch.no_grad():
             for step, (images, labels) in enumerate(test_dataloader, start=epoch * len(test_dataloader)):
                 
+                labels -= 70
                 images, labels = images.to(device), labels.to(device)
                 embeddings = model.encoder(images)
                 predictions = linear(embeddings)

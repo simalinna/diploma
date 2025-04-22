@@ -2,7 +2,7 @@ import os
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, Subset, random_split
 from torch.optim import Adam
 
 from torchvision.datasets.cifar import CIFAR10, CIFAR100
@@ -29,7 +29,7 @@ def get_arguments():
     
     parser.add_argument("--encoder-dim", type=int, default=512)
     parser.add_argument("--projector-dim", type=int, default=1024)
-    parser.add_argument("--num-classes", type=int, default=10)
+    parser.add_argument("--num-classes", type=int, default=100)
 
     parser.add_argument("--load-exp", type=str, default="none")
     parser.add_argument("--save-exp", type=str, default="exp")
@@ -53,9 +53,15 @@ def main(args):
     # скачиваем тренировочный датасет
     
     print("Загрузка датасета...")
-    data = CIFAR10(root="../datasets", train=True, download=True, transform=transforms)
-    # data = CIFAR100(root="../datasets", train=True, download=True, transform=transforms)
+    # data = CIFAR10(root="../datasets", train=True, download=True, transform=transforms)
+    data = CIFAR100(root="../datasets", train=True, download=True, transform=transforms)
     # data = ImageNet(root="../datasets", split='train', transform=transforms)
+
+    # разделение на классы
+
+    selected_classes = list(range(0, 70))
+    indices = [i for i, (_, target) in enumerate(data) if target in selected_classes]
+    data = Subset(data, indices)
 
     # разбиваем датасет на train и val
     
